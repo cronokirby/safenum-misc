@@ -40,15 +40,6 @@ type Curve interface {
 	ScalarBaseMult(k []byte) (x, y *big.Int)
 }
 
-func matchesSpecificCurve(params *CurveParams, available ...Curve) (Curve, bool) {
-	for _, c := range available {
-		if params == c.Params() {
-			return c, true
-		}
-	}
-	return nil, false
-}
-
 // CurveParams contains the parameters of an elliptic curve and also provides
 // a generic, non-constant time implementation of Curve.
 type CurveParams struct {
