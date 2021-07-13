@@ -17,6 +17,8 @@ import (
 	"io"
 	"math/big"
 	"sync"
+
+	"github.com/cronokirby/safenum"
 )
 
 // A Curve represents a short-form Weierstrass curve with a=-3.
@@ -57,17 +59,21 @@ func (curve *CurveParams) Params() *CurveParams {
 
 // polynomial returns x³ - 3x + b.
 func (curve *CurveParams) polynomial(x *big.Int) *big.Int {
-	x3 := new(big.Int).Mul(x, x)
-	x3.Mul(x3, x)
+	p := safenum.ModulusFromNat(new(safenum.Nat).SetBig(curve.P, uint(curve.P.BitLen())))
+	bNat := new(safenum.Nat).SetBig(curve.B, uint(curve.B.BitLen()))
+	xNat := new(safenum.Nat).SetBig(x, uint(x.BitLen()))
+	xNat.Mod(xNat, p)
 
-	threeX := new(big.Int).Lsh(x, 1)
-	threeX.Add(threeX, x)
+	x3 := new(safenum.Nat).ModMul(xNat, xNat, p)
+	x3.ModMul(x3, xNat, p)
 
-	x3.Sub(x3, threeX)
-	x3.Add(x3, curve.B)
-	x3.Mod(x3, curve.P)
+	threeX := new(safenum.Nat).ModAdd(xNat, xNat, p)
+	threeX.ModAdd(threeX, xNat, p)
 
-	return x3
+	x3.ModSub(x3, threeX, p)
+	x3.ModAdd(x3, bNat, p)
+
+	return x3.Big()
 }
 
 func (curve *CurveParams) IsOnCurve(x, y *big.Int) bool {
