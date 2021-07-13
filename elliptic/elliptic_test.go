@@ -9,6 +9,8 @@ import (
 	"crypto/rand"
 	"math/big"
 	"testing"
+
+	"github.com/cronokirby/safenum"
 )
 
 // genericParamsForCurve returns the dereferenced CurveParams for
@@ -134,7 +136,7 @@ func testUnmarshalToLargeCoordinates(t *testing.T, curve Curve) {
 	// Set y to mod_sqrt(x^3 - 3x + B)) so that (x mod P = 5 , y) is on the
 	// curve.
 	x := new(big.Int).Add(p, big.NewInt(5))
-	y := curve.Params().polynomial(x)
+	y := curve.Params().polynomial(new(safenum.Nat).SetBig(x, uint(x.BitLen()))).Big()
 	y.ModSqrt(y, p)
 
 	invalid := make([]byte, byteLen*2+1)
