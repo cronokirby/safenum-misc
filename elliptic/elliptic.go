@@ -88,11 +88,14 @@ func (curve *CurveParams) IsOnCurve(x, y *big.Int) bool {
 // y are zero, it assumes that they represent the point at infinity because (0,
 // 0) is not on the any of the curves handled here.
 func zForAffine(x, y *big.Int) *big.Int {
-	z := new(big.Int)
-	if x.Sign() != 0 || y.Sign() != 0 {
-		z.SetInt64(1)
+	xNat := new(safenum.Nat).SetBig(x, uint(x.BitLen()))
+	yNat := new(safenum.Nat).SetBig(y, uint(y.BitLen()))
+
+	z := new(safenum.Nat).SetUint64(0)
+	if !(xNat.EqZero() && yNat.EqZero()) {
+		z.SetUint64(1)
 	}
-	return z
+	return z.Big()
 }
 
 // affineFromJacobian reverses the Jacobian transform. See the comment at the
