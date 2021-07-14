@@ -30,13 +30,13 @@ type Curve interface {
 	// Params returns the parameters for the curve.
 	Params() *CurveParams
 	// IsOnCurve reports whether the given (x,y) lies on the curve.
-	IsOnCurve(x, y *big.Int) bool
+	IsOnCurve(x, y *safenum.Nat) bool
 	// Add returns the sum of (x1,y1) and (x2,y2)
-	Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int)
+	Add(x1, y1, x2, y2 *safenum.Nat) (x, y *safenum.Nat)
 	// Double returns 2*(x,y)
-	Double(x1, y1 *big.Int) (x, y *big.Int)
+	Double(x1, y1 *safenum.Nat) (x, y *safenum.Nat)
 	// ScalarMult returns k*(Bx,By) where k is a number in big-endian form.
-	ScalarMult(x1, y1 *big.Int, k []byte) (x, y *big.Int)
+	ScalarMult(x1, y1 *safenum.Nat, k []byte) (x, y *safenum.Nat)
 	// ScalarBaseMult returns k*G, where G is the base point of the group
 	// and k is an integer in big-endian form.
 	ScalarBaseMult(k []byte) (x, y *big.Int)
@@ -45,12 +45,12 @@ type Curve interface {
 // CurveParams contains the parameters of an elliptic curve and also provides
 // a generic, non-constant time implementation of Curve.
 type CurveParams struct {
-	P       *big.Int // the order of the underlying field
-	N       *big.Int // the order of the base point
-	B       *big.Int // the constant of the curve equation
-	Gx, Gy  *big.Int // (x,y) of the base point
-	BitSize int      // the size of the underlying field
-	Name    string   // the canonical name of the curve
+	P       *safenum.Modulus // the order of the underlying field
+	N       *safenum.Modulus // the order of the base point
+	B       *safenum.Nat     // the constant of the curve equation
+	Gx, Gy  *safenum.Nat     // (x,y) of the base point
+	BitSize int              // the size of the underlying field
+	Name    string           // the canonical name of the curve
 }
 
 func (curve *CurveParams) Params() *CurveParams {
@@ -59,64 +59,55 @@ func (curve *CurveParams) Params() *CurveParams {
 
 // polynomial returns x³ - 3x + b.
 func (curve *CurveParams) polynomial(x *safenum.Nat) *safenum.Nat {
-	p := safenum.ModulusFromNat(new(safenum.Nat).SetBig(curve.P, uint(curve.P.BitLen())))
-	bNat := new(safenum.Nat).SetBig(curve.B, uint(curve.B.BitLen()))
+	x3 := new(safenum.Nat).ModMul(x, x, curve.P)
+	x3.ModMul(x3, x, curve.P)
 
-	x3 := new(safenum.Nat).ModMul(x, x, p)
-	x3.ModMul(x3, x, p)
+	threeX := new(safenum.Nat).ModAdd(x, x, curve.P)
+	threeX.ModAdd(threeX, x, curve.P)
 
-	threeX := new(safenum.Nat).ModAdd(x, x, p)
-	threeX.ModAdd(threeX, x, p)
-
-	x3.ModSub(x3, threeX, p)
-	x3.ModAdd(x3, bNat, p)
+	x3.ModSub(x3, threeX, curve.P)
+	x3.ModAdd(x3, curve.B, curve.P)
 
 	return x3
 }
 
-func (curve *CurveParams) IsOnCurve(x, y *big.Int) bool {
-	p := safenum.ModulusFromNat(new(safenum.Nat).SetBig(curve.P, uint(curve.P.BitLen())))
-	xNat := new(safenum.Nat).SetBig(x, uint(x.BitLen()))
-	yNat := new(safenum.Nat).SetBig(y, uint(y.BitLen()))
+func (curve *CurveParams) IsOnCurve(x, y *safenum.Nat) bool {
 	// y² = x³ - 3x + b
-	y2 := new(safenum.Nat).ModMul(yNat, yNat, p)
+	y2 := new(safenum.Nat).ModMul(y, y, curve.P)
 
-	return curve.polynomial(xNat).Cmp(y2) == 0
+	return curve.polynomial(x).Cmp(y2) == 0
 }
 
 // zForAffine returns a Jacobian Z value for the affine point (x, y). If x and
 // y are zero, it assumes that they represent the point at infinity because (0,
 // 0) is not on the any of the curves handled here.
-func zForAffine(x, y *big.Int) *big.Int {
-	xNat := new(safenum.Nat).SetBig(x, uint(x.BitLen()))
-	yNat := new(safenum.Nat).SetBig(y, uint(y.BitLen()))
-
+func zForAffine(x, y *safenum.Nat) *safenum.Nat {
 	z := new(safenum.Nat).SetUint64(0)
-	if !(xNat.EqZero() && yNat.EqZero()) {
+	if !(x.EqZero() && y.EqZero()) {
 		z.SetUint64(1)
 	}
-	return z.Big()
+	return z
 }
 
 // affineFromJacobian reverses the Jacobian transform. See the comment at the
 // top of the file. If the point is ∞ it returns 0, 0.
-func (curve *CurveParams) affineFromJacobian(x, y, z *big.Int) (xOut, yOut *big.Int) {
-	if z.Sign() == 0 {
-		return new(big.Int), new(big.Int)
+func (curve *CurveParams) affineFromJacobian(x, y, z *safenum.Nat) (xOut, yOut *safenum.Nat) {
+	if z.EqZero() {
+		return new(safenum.Nat), new(safenum.Nat)
 	}
 
-	zinv := new(big.Int).ModInverse(z, curve.P)
-	zinvsq := new(big.Int).Mul(zinv, zinv)
+	zinv := new(safenum.Nat).ModInverse(z, curve.P)
+	zinvsq := new(safenum.Nat).ModMul(zinv, zinv, curve.P)
 
-	xOut = new(big.Int).Mul(x, zinvsq)
+	xOut = new(safenum.Nat).ModMul(x, zinvsq, curve.P)
 	xOut.Mod(xOut, curve.P)
-	zinvsq.Mul(zinvsq, zinv)
-	yOut = new(big.Int).Mul(y, zinvsq)
+	zinvsq.ModMul(zinvsq, zinv, curve.P)
+	yOut = new(safenum.Nat).ModMul(y, zinvsq, curve.P)
 	yOut.Mod(yOut, curve.P)
 	return
 }
 
-func (curve *CurveParams) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
+func (curve *CurveParams) Add(x1, y1, x2, y2 *safenum.Nat) (*safenum.Nat, *safenum.Nat) {
 	z1 := zForAffine(x1, y1)
 	z2 := zForAffine(x2, y2)
 	return curve.affineFromJacobian(curve.addJacobian(x1, y1, z1, x2, y2, z2))
@@ -124,32 +115,28 @@ func (curve *CurveParams) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
 
 // addJacobian takes two points in Jacobian coordinates, (x1, y1, z1) and
 // (x2, y2, z2) and returns their sum, also in Jacobian form.
-func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *big.Int) (*big.Int, *big.Int, *big.Int) {
+func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*safenum.Nat, *safenum.Nat, *safenum.Nat) {
 	// See https://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-add-2007-bl
-	x3, y3, z3 := new(big.Int), new(big.Int), new(big.Int)
-	if z1.Sign() == 0 {
-		x3.Set(x2)
-		y3.Set(y2)
-		z3.Set(z2)
+	x3, y3, z3 := new(safenum.Nat), new(safenum.Nat), new(safenum.Nat)
+	if z1.EqZero() {
+		x3.SetNat(x2)
+		y3.SetNat(y2)
+		z3.SetNat(z2)
 		return x3, y3, z3
 	}
-	if z2.Sign() == 0 {
-		x3.Set(x1)
-		y3.Set(y1)
-		z3.Set(z1)
+	if z2.EqZero() {
+		x3.SetNat(x1)
+		y3.SetNat(y1)
+		z3.SetNat(z1)
 		return x3, y3, z3
 	}
 
-	z1z1 := new(big.Int).Mul(z1, z1)
-	z1z1.Mod(z1z1, curve.P)
-	z2z2 := new(big.Int).Mul(z2, z2)
-	z2z2.Mod(z2z2, curve.P)
+	z1z1 := new(safenum.Nat).ModMul(z1, z1, curve.P)
+	z2z2 := new(safenum.Nat).ModMul(z2, z2, curve.P)
 
-	u1 := new(big.Int).Mul(x1, z2z2)
-	u1.Mod(u1, curve.P)
-	u2 := new(big.Int).Mul(x2, z1z1)
-	u2.Mod(u2, curve.P)
-	h := new(big.Int).Sub(u2, u1)
+	u1 := new(safenum.Nat).ModMul(x1, z2z2, curve.P)
+	u2 := new(safenum.Nat).ModMul(x2, z1z1, curve.P)
+	h := new(big.Int).ModSub(u2, u1, curve.P)
 	xEqual := h.Sign() == 0
 	if h.Sign() == -1 {
 		h.Add(h, curve.P)
