@@ -7,7 +7,6 @@ package elliptic
 import (
 	"bytes"
 	"crypto/rand"
-	"math/big"
 	"testing"
 
 	"github.com/cronokirby/safenum"
@@ -53,7 +52,7 @@ func TestOnCurve(t *testing.T) {
 
 func TestOffCurve(t *testing.T) {
 	testAllCurves(t, func(t *testing.T, curve Curve) {
-		x, y := new(big.Int).SetInt64(1), new(big.Int).SetInt64(1)
+		x, y := new(safenum.Nat).SetUint64(1), new(safenum.Nat).SetUint64(1)
 		if curve.IsOnCurve(x, y) {
 			t.Errorf("point off curve is claimed to be on the curve")
 		}
@@ -72,19 +71,19 @@ func TestInfinity(t *testing.T) {
 func testInfinity(t *testing.T, curve Curve) {
 	_, x, y, _ := GenerateKey(curve, rand.Reader)
 	x, y = curve.ScalarMult(x, y, curve.Params().N.Bytes())
-	if x.Sign() != 0 || y.Sign() != 0 {
+	if !x.EqZero() || !y.EqZero() {
 		t.Errorf("x^q != ∞")
 	}
 
 	x, y = curve.ScalarBaseMult([]byte{0})
-	if x.Sign() != 0 || y.Sign() != 0 {
+	if !x.EqZero() || !y.EqZero() {
 		t.Errorf("b^0 != ∞")
-		x.SetInt64(0)
-		y.SetInt64(0)
+		x.SetUint64(0)
+		y.SetUint64(0)
 	}
 
 	x2, y2 := curve.Double(x, y)
-	if x2.Sign() != 0 || y2.Sign() != 0 {
+	if !x2.EqZero() || !y2.EqZero() {
 		t.Errorf("2∞ != ∞")
 	}
 
@@ -135,8 +134,8 @@ func testUnmarshalToLargeCoordinates(t *testing.T, curve Curve) {
 	// Set x to be greater than curve's parameter P – specifically, to P+5.
 	// Set y to mod_sqrt(x^3 - 3x + B)) so that (x mod P = 5 , y) is on the
 	// curve.
-	x := new(big.Int).Add(p, big.NewInt(5))
-	y := curve.Params().polynomial(new(safenum.Nat).SetBig(x, uint(x.BitLen()))).Big()
+	x := new(safenum.Nat).Add(new(safenum.Nat).SetBytes(p.Bytes()), new(safenum.Nat).SetUint64(5), p.BitLen()+3)
+	y := curve.Params().polynomial(x)
 	y.ModSqrt(y, p)
 
 	invalid := make([]byte, byteLen*2+1)
@@ -164,7 +163,7 @@ func TestMarshalCompressed(t *testing.T) {
 
 }
 
-func testMarshalCompressed(t *testing.T, curve Curve, x, y *big.Int, want []byte) {
+func testMarshalCompressed(t *testing.T, curve Curve, x, y *safenum.Nat, want []byte) {
 	if !curve.IsOnCurve(x, y) {
 		t.Fatal("invalid test point")
 	}
@@ -209,7 +208,7 @@ func BenchmarkScalarBaseMult(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			x, _ := curve.ScalarBaseMult(priv)
 			// Prevent the compiler from optimizing out the operation.
-			priv[0] ^= byte(x.Bits()[0])
+			priv[0] ^= byte(x.Byte(0))
 		}
 	})
 }
