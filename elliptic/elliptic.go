@@ -235,13 +235,14 @@ func (curve *CurveParams) ScalarMult(Bx, By *safenum.Nat, k []byte) (*safenum.Na
 	Bz := new(safenum.Nat).SetUint64(1)
 	x, y, z := new(safenum.Nat), new(safenum.Nat), new(safenum.Nat)
 
-	for _, byte := range k {
-		for bitNum := 0; bitNum < 8; bitNum++ {
+	for _, b := range k {
+		for i := 7; i >= 0; i-- {
 			x, y, z = curve.doubleJacobian(x, y, z)
-			if byte&0x80 == 0x80 {
-				x, y, z = curve.addJacobian(Bx, By, Bz, x, y, z)
-			}
-			byte <<= 1
+			addIn := safenum.Choice((b >> i) & 1)
+			scratchX, scratchY, scratchZ := curve.addJacobian(Bx, By, Bz, x, y, z)
+			x.CondAssign(addIn, scratchX)
+			y.CondAssign(addIn, scratchY)
+			z.CondAssign(addIn, scratchZ)
 		}
 	}
 
