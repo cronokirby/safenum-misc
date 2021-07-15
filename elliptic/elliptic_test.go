@@ -71,19 +71,19 @@ func TestInfinity(t *testing.T) {
 func testInfinity(t *testing.T, curve Curve) {
 	_, x, y, _ := GenerateKey(curve, rand.Reader)
 	x, y = curve.ScalarMult(x, y, curve.Params().N.Bytes())
-	if !x.EqZero() || !y.EqZero() {
+	if x.EqZero() == 0 || y.EqZero() == 0 {
 		t.Errorf("x^q != ∞")
 	}
 
 	x, y = curve.ScalarBaseMult([]byte{0})
-	if !x.EqZero() || !y.EqZero() {
+	if x.EqZero() == 0 || y.EqZero() == 0 {
 		t.Errorf("b^0 != ∞")
 		x.SetUint64(0)
 		y.SetUint64(0)
 	}
 
 	x2, y2 := curve.Double(x, y)
-	if !x2.EqZero() || !y2.EqZero() {
+	if x2.EqZero() == 0 || y2.EqZero() == 0 {
 		t.Errorf("2∞ != ∞")
 	}
 
@@ -91,12 +91,12 @@ func testInfinity(t *testing.T, curve Curve) {
 	baseY := curve.Params().Gy
 
 	x3, y3 := curve.Add(baseX, baseY, x, y)
-	if x3.Cmp(baseX) != 0 || y3.Cmp(baseY) != 0 {
+	if x3.Eq(baseX) != 1 || y3.Eq(baseY) != 1 {
 		t.Errorf("x+∞ != x")
 	}
 
 	x4, y4 := curve.Add(x, y, baseX, baseY)
-	if x4.Cmp(baseX) != 0 || y4.Cmp(baseY) != 0 {
+	if x4.Eq(baseX) != 1 || y4.Eq(baseY) != 1 {
 		t.Errorf("∞+x != x")
 	}
 
@@ -116,7 +116,7 @@ func TestMarshal(t *testing.T) {
 		if xx == nil {
 			t.Fatal("failed to unmarshal")
 		}
-		if xx.Cmp(x) != 0 || yy.Cmp(y) != 0 {
+		if xx.Eq(x) != 1 || yy.Eq(y) != 1 {
 			t.Fatal("unmarshal returned different values")
 		}
 	})
@@ -180,7 +180,7 @@ func testMarshalCompressed(t *testing.T, curve Curve, x, y *safenum.Nat, want []
 	if !curve.IsOnCurve(X, Y) {
 		t.Error("UnmarshalCompressed returned a point not on the curve")
 	}
-	if X.Cmp(x) != 0 || Y.Cmp(y) != 0 {
+	if X.Eq(x) != 1 || Y.Eq(y) != 1 {
 		t.Errorf("point did not round-trip correctly: got (%v, %v), want (%v, %v)", X, Y, x, y)
 	}
 }

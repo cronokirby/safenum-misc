@@ -75,7 +75,7 @@ func (curve *CurveParams) IsOnCurve(x, y *safenum.Nat) bool {
 	// y² = x³ - 3x + b
 	y2 := new(safenum.Nat).ModMul(y, y, curve.P)
 
-	return curve.polynomial(x).Cmp(y2) == 0
+	return curve.polynomial(x).Eq(y2) == 1
 }
 
 // zForAffine returns a Jacobian Z value for the affine point (x, y). If x and
@@ -83,7 +83,7 @@ func (curve *CurveParams) IsOnCurve(x, y *safenum.Nat) bool {
 // 0) is not on the any of the curves handled here.
 func zForAffine(x, y *safenum.Nat) *safenum.Nat {
 	z := new(safenum.Nat).SetUint64(0)
-	if !(x.EqZero() && y.EqZero()) {
+	if !(x.EqZero() == 1 && y.EqZero() == 1) {
 		z.SetUint64(1)
 	}
 	return z
@@ -92,7 +92,7 @@ func zForAffine(x, y *safenum.Nat) *safenum.Nat {
 // affineFromJacobian reverses the Jacobian transform. See the comment at the
 // top of the file. If the point is ∞ it returns 0, 0.
 func (curve *CurveParams) affineFromJacobian(x, y, z *safenum.Nat) (xOut, yOut *safenum.Nat) {
-	if z.EqZero() {
+	if z.EqZero() == 1 {
 		return new(safenum.Nat), new(safenum.Nat)
 	}
 
@@ -118,13 +118,13 @@ func (curve *CurveParams) Add(x1, y1, x2, y2 *safenum.Nat) (*safenum.Nat, *safen
 func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*safenum.Nat, *safenum.Nat, *safenum.Nat) {
 	// See https://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-add-2007-bl
 	x3, y3, z3 := new(safenum.Nat), new(safenum.Nat), new(safenum.Nat)
-	if z1.EqZero() {
+	if z1.EqZero() == 1 {
 		x3.SetNat(x2)
 		y3.SetNat(y2)
 		z3.SetNat(z2)
 		return x3, y3, z3
 	}
-	if z2.EqZero() {
+	if z2.EqZero() == 1 {
 		x3.SetNat(x1)
 		y3.SetNat(y1)
 		z3.SetNat(z1)
@@ -137,7 +137,7 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	u1 := new(safenum.Nat).ModMul(x1, z2z2, curve.P)
 	u2 := new(safenum.Nat).ModMul(x2, z1z1, curve.P)
 	h := new(safenum.Nat).ModSub(u2, u1, curve.P)
-	xEqual := h.EqZero()
+	xEqual := h.EqZero() == 1
 	i := new(safenum.Nat).ModAdd(h, h, curve.P)
 	i.ModMul(i, i, curve.P)
 	j := new(safenum.Nat).ModMul(h, i, curve.P)
@@ -147,7 +147,7 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	s2 := new(safenum.Nat).ModMul(y2, z1, curve.P)
 	s2.ModMul(s2, z1z1, curve.P)
 	r := new(safenum.Nat).ModSub(s2, s1, curve.P)
-	yEqual := r.EqZero()
+	yEqual := r.EqZero() == 1
 	if xEqual && yEqual {
 		return curve.doubleJacobian(x1, y1, z1)
 	}
@@ -270,7 +270,8 @@ func GenerateKey(curve Curve, rand io.Reader) (priv []byte, x, y *safenum.Nat, e
 		priv[1] ^= 0x42
 
 		// If the scalar is out of range, sample another random number.
-		if new(safenum.Nat).SetBytes(priv).CmpMod(N) >= 0 {
+		gt, eq, _ := new(safenum.Nat).SetBytes(priv).CmpMod(N)
+		if (gt | eq) == 1 {
 			continue
 		}
 
@@ -316,8 +317,13 @@ func Unmarshal(curve Curve, data []byte) (x, y *safenum.Nat) {
 	}
 	p := curve.Params().P
 	x = new(safenum.Nat).SetBytes(data[1 : 1+byteLen])
+	_, _, lt := x.CmpMod(p)
+	if lt != 1 {
+		return nil, nil
+	}
 	y = new(safenum.Nat).SetBytes(data[1+byteLen:])
-	if x.CmpMod(p) >= 0 || y.CmpMod(p) >= 0 {
+	_, _, lt = y.CmpMod(p)
+	if lt != 1 {
 		return nil, nil
 	}
 	if !curve.IsOnCurve(x, y) {
@@ -339,7 +345,8 @@ func UnmarshalCompressed(curve Curve, data []byte) (x, y *safenum.Nat) {
 	}
 	p := curve.Params().P
 	x = new(safenum.Nat).SetBytes(data[1:])
-	if x.CmpMod(p) >= 0 {
+	_, _, lt := x.CmpMod(p)
+	if lt != 1 {
 		return nil, nil
 	}
 	// y² = x³ - 3x + b
@@ -366,7 +373,7 @@ func initAll() {
 
 func natFromString(s string, base int) (*safenum.Nat, bool) {
 	x, success := new(big.Int).SetString(s, base)
-	return new(safenum.Nat).SetBig(x, uint(x.BitLen())), success
+	return new(safenum.Nat).SetBig(x, x.BitLen()), success
 }
 
 func modFromString(s string, base int) (*safenum.Modulus, bool) {
