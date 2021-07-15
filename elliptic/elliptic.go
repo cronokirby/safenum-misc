@@ -83,9 +83,8 @@ func (curve *CurveParams) IsOnCurve(x, y *safenum.Nat) bool {
 // 0) is not on the any of the curves handled here.
 func zForAffine(x, y *safenum.Nat) *safenum.Nat {
 	z := new(safenum.Nat).SetUint64(0)
-	if !(x.EqZero() == 1 && y.EqZero() == 1) {
-		z.SetUint64(1)
-	}
+	one := new(safenum.Nat).SetUint64(1)
+	z.CondAssign(1^(x.EqZero()&y.EqZero()), one)
 	return z
 }
 
