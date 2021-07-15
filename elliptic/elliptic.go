@@ -91,10 +91,6 @@ func zForAffine(x, y *safenum.Nat) *safenum.Nat {
 // affineFromJacobian reverses the Jacobian transform. See the comment at the
 // top of the file. If the point is ∞ it returns 0, 0.
 func (curve *CurveParams) affineFromJacobian(x, y, z *safenum.Nat) (xOut, yOut *safenum.Nat) {
-	if z.EqZero() == 1 {
-		return new(safenum.Nat), new(safenum.Nat)
-	}
-
 	zinv := new(safenum.Nat).ModInverse(z, curve.P)
 	zinvsq := new(safenum.Nat).ModMul(zinv, zinv, curve.P)
 
@@ -103,6 +99,11 @@ func (curve *CurveParams) affineFromJacobian(x, y, z *safenum.Nat) (xOut, yOut *
 	zinvsq.ModMul(zinvsq, zinv, curve.P)
 	yOut = new(safenum.Nat).ModMul(y, zinvsq, curve.P)
 	yOut.Mod(yOut, curve.P)
+
+	infinity := z.EqZero()
+	zero := new(safenum.Nat)
+	xOut.CondAssign(infinity, zero)
+	yOut.CondAssign(infinity, zero)
 	return
 }
 
