@@ -118,18 +118,9 @@ func (curve *CurveParams) Add(x1, y1, x2, y2 *safenum.Nat) (*safenum.Nat, *safen
 func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*safenum.Nat, *safenum.Nat, *safenum.Nat) {
 	// See https://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-add-2007-bl
 	x3, y3, z3 := new(safenum.Nat), new(safenum.Nat), new(safenum.Nat)
-	if z1.EqZero() == 1 {
-		x3.SetNat(x2)
-		y3.SetNat(y2)
-		z3.SetNat(z2)
-		return x3, y3, z3
-	}
-	if z2.EqZero() == 1 {
-		x3.SetNat(x1)
-		y3.SetNat(y1)
-		z3.SetNat(z1)
-		return x3, y3, z3
-	}
+
+	infinity1 := z1.EqZero()
+	infinity2 := z2.EqZero()
 
 	z1z1 := new(safenum.Nat).ModMul(z1, z1, curve.P)
 	z2z2 := new(safenum.Nat).ModMul(z2, z2, curve.P)
@@ -137,7 +128,7 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	u1 := new(safenum.Nat).ModMul(x1, z2z2, curve.P)
 	u2 := new(safenum.Nat).ModMul(x2, z1z1, curve.P)
 	h := new(safenum.Nat).ModSub(u2, u1, curve.P)
-	xEqual := h.EqZero() == 1
+	xEqual := h.EqZero()
 	i := new(safenum.Nat).ModAdd(h, h, curve.P)
 	i.ModMul(i, i, curve.P)
 	j := new(safenum.Nat).ModMul(h, i, curve.P)
@@ -147,10 +138,7 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	s2 := new(safenum.Nat).ModMul(y2, z1, curve.P)
 	s2.ModMul(s2, z1z1, curve.P)
 	r := new(safenum.Nat).ModSub(s2, s1, curve.P)
-	yEqual := r.EqZero() == 1
-	if xEqual && yEqual {
-		return curve.doubleJacobian(x1, y1, z1)
-	}
+	yEqual := r.EqZero()
 	r.ModAdd(r, r, curve.P)
 	v := new(safenum.Nat).ModMul(u1, i, curve.P)
 
@@ -173,6 +161,23 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	z3.ModSub(z3, z2z2, curve.P)
 	z3.ModMul(z3, h, curve.P)
 	z3.Mod(z3, curve.P)
+
+	// If the affine coordinates were equal, our result is garbage, use the doubling method
+	affineEqual := xEqual & yEqual
+	doubledX, doubledY, doubledZ := curve.doubleJacobian(x1, y1, z1)
+	x3.CondAssign(affineEqual, doubledX)
+	y3.CondAssign(affineEqual, doubledY)
+	z3.CondAssign(affineEqual, doubledZ)
+
+	// If either points were infinity, everything above is garbage.
+	// Choose the point that wasn't infinity.
+	x3.CondAssign(infinity1, x2)
+	y3.CondAssign(infinity1, y2)
+	z3.CondAssign(infinity1, z2)
+
+	x3.CondAssign(infinity2, x1)
+	y3.CondAssign(infinity2, y1)
+	z3.CondAssign(infinity2, z1)
 
 	return x3, y3, z3
 }
