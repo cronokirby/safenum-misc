@@ -7,8 +7,6 @@ package elliptic
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
-	mrand "math/rand"
 	"testing"
 
 	"github.com/cronokirby/safenum"
@@ -73,7 +71,6 @@ func TestInfinity(t *testing.T) {
 func testInfinity(t *testing.T, curve Curve) {
 	_, x, y, _ := GenerateKey(curve, rand.Reader)
 	x, y = curve.ScalarMult(x, y, curve.Params().N.Bytes())
-	fmt.Println("x", x, "y", y)
 	if x.EqZero() == 0 || y.EqZero() == 0 {
 		t.Errorf("x^q != ∞")
 	}
@@ -110,7 +107,7 @@ func testInfinity(t *testing.T, curve Curve) {
 
 func TestMarshal(t *testing.T) {
 	testAllCurves(t, func(t *testing.T, curve Curve) {
-		_, x, y, err := GenerateKey(curve, mrand.New(mrand.NewSource(0)))
+		_, x, y, err := GenerateKey(curve, rand.Reader)
 		if err != nil {
 			t.Fatal(err)
 		}
