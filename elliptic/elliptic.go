@@ -201,8 +201,8 @@ func (curve *CurveParams) doubleJacobian(x, y, z *safenum.Nat) (*safenum.Nat, *s
 
 	x3 := new(safenum.Nat).ModMul(alpha, alpha, curve.P)
 	beta8 := new(safenum.Nat).ModAdd(beta, beta, curve.P)
-	beta8.ModAdd(beta, beta, curve.P)
-	beta8.ModAdd(beta, beta, curve.P)
+	beta8.ModAdd(beta8, beta8, curve.P)
+	beta8.ModAdd(beta8, beta8, curve.P)
 	x3.ModSub(x3, beta8, curve.P)
 
 	z3 := new(safenum.Nat).ModAdd(y, z, curve.P)
