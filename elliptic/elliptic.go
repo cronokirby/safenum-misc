@@ -360,9 +360,8 @@ func UnmarshalCompressed(curve Curve, data []byte) (x, y *safenum.Nat) {
 	if y == nil {
 		return nil, nil
 	}
-	if byte(y.Byte(0)&1) != data[0]&1 {
-		y.ModSub(new(safenum.Nat), y, p)
-	}
+	negated := new(safenum.Nat).ModNeg(y, p)
+	y.CondAssign(safenum.Choice(y.Byte(0)&1)^safenum.Choice(data[0]&1), negated)
 	if !curve.IsOnCurve(x, y) {
 		return nil, nil
 	}
