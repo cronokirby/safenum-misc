@@ -14,6 +14,7 @@ package elliptic
 // reverse the transform than to operate in affine coordinates.
 
 import (
+	"fmt"
 	"io"
 	"math/big"
 	"sync"
@@ -74,6 +75,8 @@ func (curve *CurveParams) polynomial(x *safenum.Nat) *safenum.Nat {
 func (curve *CurveParams) IsOnCurve(x, y *safenum.Nat) bool {
 	// y² = x³ - 3x + b
 	y2 := new(safenum.Nat).ModMul(y, y, curve.P)
+	fmt.Println("y2", y2)
+	fmt.Println("f(x)", curve.polynomial(x))
 
 	return curve.polynomial(x).Eq(y2) == 1
 }
@@ -82,8 +85,8 @@ func (curve *CurveParams) IsOnCurve(x, y *safenum.Nat) bool {
 // y are zero, it assumes that they represent the point at infinity because (0,
 // 0) is not on the any of the curves handled here.
 func zForAffine(x, y *safenum.Nat) *safenum.Nat {
-	z := new(safenum.Nat).SetUint64(0)
-	if !(x.EqZero() == 1 && y.EqZero() == 1) {
+	z := new(safenum.Nat)
+	if x.EqZero() != 1 || y.EqZero() != 1 {
 		z.SetUint64(1)
 	}
 	return z
@@ -100,10 +103,8 @@ func (curve *CurveParams) affineFromJacobian(x, y, z *safenum.Nat) (xOut, yOut *
 	zinvsq := new(safenum.Nat).ModMul(zinv, zinv, curve.P)
 
 	xOut = new(safenum.Nat).ModMul(x, zinvsq, curve.P)
-	xOut.Mod(xOut, curve.P)
 	zinvsq.ModMul(zinvsq, zinv, curve.P)
 	yOut = new(safenum.Nat).ModMul(y, zinvsq, curve.P)
-	yOut.Mod(yOut, curve.P)
 	return
 }
 
@@ -172,7 +173,6 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	z3.ModSub(z3, z1z1, curve.P)
 	z3.ModSub(z3, z2z2, curve.P)
 	z3.ModMul(z3, h, curve.P)
-	z3.Mod(z3, curve.P)
 
 	return x3, y3, z3
 }
@@ -187,9 +187,7 @@ func (curve *CurveParams) Double(x1, y1 *safenum.Nat) (*safenum.Nat, *safenum.Na
 func (curve *CurveParams) doubleJacobian(x, y, z *safenum.Nat) (*safenum.Nat, *safenum.Nat, *safenum.Nat) {
 	// See https://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#doubling-dbl-2001-b
 	delta := new(safenum.Nat).ModMul(z, z, curve.P)
-	delta.Mod(delta, curve.P)
 	gamma := new(safenum.Nat).ModMul(y, y, curve.P)
-	gamma.Mod(gamma, curve.P)
 	alpha := new(safenum.Nat).ModSub(x, delta, curve.P)
 	alpha2 := new(safenum.Nat).ModAdd(x, delta, curve.P)
 	alpha.ModMul(alpha, alpha2, curve.P)
@@ -270,8 +268,8 @@ func GenerateKey(curve Curve, rand io.Reader) (priv []byte, x, y *safenum.Nat, e
 		priv[1] ^= 0x42
 
 		// If the scalar is out of range, sample another random number.
-		gt, eq, _ := new(safenum.Nat).SetBytes(priv).CmpMod(N)
-		if (gt | eq) == 1 {
+		_, _, lt := new(safenum.Nat).SetBytes(priv).CmpMod(N)
+		if lt != 1 {
 			continue
 		}
 
@@ -290,6 +288,7 @@ func Marshal(curve Curve, x, y *safenum.Nat) []byte {
 
 	x.FillBytes(ret[1 : 1+byteLen])
 	y.FillBytes(ret[1+byteLen : 1+2*byteLen])
+	fmt.Println("Marshal", x, y)
 
 	return ret
 }
@@ -317,16 +316,19 @@ func Unmarshal(curve Curve, data []byte) (x, y *safenum.Nat) {
 	}
 	p := curve.Params().P
 	x = new(safenum.Nat).SetBytes(data[1 : 1+byteLen])
+	fmt.Println("unmarshaled x:", x)
 	_, _, lt := x.CmpMod(p)
 	if lt != 1 {
 		return nil, nil
 	}
 	y = new(safenum.Nat).SetBytes(data[1+byteLen:])
+	fmt.Println("unmarshaled y:", y)
 	_, _, lt = y.CmpMod(p)
 	if lt != 1 {
 		return nil, nil
 	}
 	if !curve.IsOnCurve(x, y) {
+		fmt.Println("not on curve :(")
 		return nil, nil
 	}
 	return
