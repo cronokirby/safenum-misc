@@ -120,7 +120,19 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	x3, y3, z3 := new(safenum.Nat), new(safenum.Nat), new(safenum.Nat)
 
 	infinity1 := z1.EqZero()
+	if infinity1 == 1 {
+		x3.SetNat(x2)
+		y3.SetNat(y2)
+		z3.SetNat(z2)
+		return x3, y3, z3
+	}
 	infinity2 := z2.EqZero()
+	if infinity2 == 1 {
+		x3.SetNat(x1)
+		y3.SetNat(y1)
+		z3.SetNat(z1)
+		return x3, y3, z3
+	}
 
 	z1z1 := new(safenum.Nat).ModMul(z1, z1, curve.P)
 	z2z2 := new(safenum.Nat).ModMul(z2, z2, curve.P)
@@ -139,6 +151,14 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	s2.ModMul(s2, z1z1, curve.P)
 	r := new(safenum.Nat).ModSub(s2, s1, curve.P)
 	yEqual := r.EqZero()
+	affineEqual := xEqual & yEqual
+	if affineEqual == 1 {
+		doubledX, doubledY, doubledZ := curve.doubleJacobian(x1, y1, z1)
+		x3.SetNat(doubledX)
+		y3.SetNat(doubledY)
+		z3.SetNat(doubledZ)
+		return x3, y3, z3
+	}
 	r.ModAdd(r, r, curve.P)
 	v := new(safenum.Nat).ModMul(u1, i, curve.P)
 
@@ -163,21 +183,18 @@ func (curve *CurveParams) addJacobian(x1, y1, z1, x2, y2, z2 *safenum.Nat) (*saf
 	z3.Mod(z3, curve.P)
 
 	// If the affine coordinates were equal, our result is garbage, use the doubling method
-	affineEqual := xEqual & yEqual
-	doubledX, doubledY, doubledZ := curve.doubleJacobian(x1, y1, z1)
-	x3.CondAssign(affineEqual, doubledX)
-	y3.CondAssign(affineEqual, doubledY)
-	z3.CondAssign(affineEqual, doubledZ)
 
 	// If either points were infinity, everything above is garbage.
 	// Choose the point that wasn't infinity.
-	x3.CondAssign(infinity1, x2)
-	y3.CondAssign(infinity1, y2)
-	z3.CondAssign(infinity1, z2)
+	/*
+		x3.CondAssign(infinity1, x2)
+		y3.CondAssign(infinity1, y2)
+		z3.CondAssign(infinity1, z2)
 
-	x3.CondAssign(infinity2, x1)
-	y3.CondAssign(infinity2, y1)
-	z3.CondAssign(infinity2, z1)
+		x3.CondAssign(infinity2, x1)
+		y3.CondAssign(infinity2, y1)
+		z3.CondAssign(infinity2, z1)
+	*/
 
 	return x3, y3, z3
 }
@@ -239,10 +256,14 @@ func (curve *CurveParams) ScalarMult(Bx, By *safenum.Nat, k []byte) (*safenum.Na
 		for i := 7; i >= 0; i-- {
 			x, y, z = curve.doubleJacobian(x, y, z)
 			addIn := safenum.Choice((b >> i) & 1)
-			scratchX, scratchY, scratchZ := curve.addJacobian(Bx, By, Bz, x, y, z)
-			x.CondAssign(addIn, scratchX)
-			y.CondAssign(addIn, scratchY)
-			z.CondAssign(addIn, scratchZ)
+			if addIn == 1 {
+				x, y, z = curve.addJacobian(Bx, By, Bz, x, y, z)
+			}
+			/*
+				x.CondAssign(addIn, scratchX)
+				y.CondAssign(addIn, scratchY)
+				z.CondAssign(addIn, scratchZ)
+			*/
 		}
 	}
 
