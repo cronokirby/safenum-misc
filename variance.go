@@ -44,25 +44,31 @@ func modBig() *big.Int {
 	return mod2048().Big()
 }
 
+const average = 400
+
 func timeFunction(f func()) time.Duration {
+
 	start := time.Now()
-	f()
-	return time.Since(start)
+
+	for i := 0; i < average; i++ {
+		f()
+	}
+	return time.Since(start) / average
 }
 
 const maxBits = 4096
 const expBits = 64
 
-var resultBig *big.Int
-var resultNat *safenum.Nat
+var resultBig *big.Int = new(big.Int)
+var resultNat *safenum.Nat = new(safenum.Nat)
 
 func modAddBigSamples(w *csv.Writer) error {
 	m := modBig()
 	for i := 0; i < maxBits; i++ {
 		x := bigSized(i)
 		t := timeFunction(func() {
-			x.Add(x, x)
-			resultBig = x.Mod(x, m)
+			resultBig.Add(x, x)
+			resultBig.Mod(resultBig, m)
 		})
 		if err := w.Write([]string{"ModAddBig", fmt.Sprintf("%d", i), fmt.Sprintf("%d", t)}); err != nil {
 			return err
@@ -76,8 +82,9 @@ func modAddNatSamples(w *csv.Writer) error {
 	m := mod2048()
 	for i := 0; i < maxBits; i++ {
 		x := natSized(i).Resize(maxBits)
+		resultNat.Resize(maxBits)
 		t := timeFunction(func() {
-			resultNat = x.ModAdd(x, x, m)
+			resultNat.ModAdd(x, x, m)
 		})
 		if err := w.Write([]string{"ModAddNat", fmt.Sprintf("%d", i), fmt.Sprintf("%d", t)}); err != nil {
 			return err
@@ -94,7 +101,7 @@ func expBigSamples(w *csv.Writer) error {
 	for i := 0; i < expBits; i++ {
 		y := withHammingWeight(expBits, i).Big()
 		t := timeFunction(func() {
-			resultBig = x.Exp(x, y, m)
+			resultBig.Exp(x, y, m)
 		})
 		if err := w.Write([]string{"ModExpBig", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", t)}); err != nil {
 			return err
@@ -111,7 +118,7 @@ func expNatSamples(w *csv.Writer) error {
 	for i := 0; i < expBits; i++ {
 		y := withHammingWeight(expBits, i)
 		t := timeFunction(func() {
-			resultNat = x.Exp(x, y, m)
+			resultNat.Exp(x, y, m)
 		})
 		if err := w.Write([]string{"ModExpNat", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", t)}); err != nil {
 			return err
