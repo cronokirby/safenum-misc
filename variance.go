@@ -19,6 +19,15 @@ func natSized(bits int) *safenum.Nat {
 	return new(safenum.Nat).SetBytes(data).Resize(bits)
 }
 
+func withHammingWeight(maxBits int, h int) *safenum.Nat {
+	hi := new(safenum.Nat).SetUint64(1).Resize(1)
+	hi.Lsh(hi, uint(maxBits)-1, -1)
+	lo := new(safenum.Nat).SetUint64(1).Resize(1)
+	lo.Lsh(lo, uint(h), -1)
+	lo.Sub(lo, new(safenum.Nat).SetUint64(1), -1)
+	return hi.Add(hi, lo, maxBits)
+}
+
 func mod2048() *safenum.Modulus {
 	data := make([]byte, 2048/8)
 	for i := 0; i < len(data); i++ {
@@ -42,6 +51,7 @@ func timeFunction(f func()) time.Duration {
 }
 
 const maxBits = 4096
+const expBits = 64
 
 var resultBig *big.Int
 var resultNat *safenum.Nat
@@ -77,6 +87,40 @@ func modAddNatSamples(w *csv.Writer) error {
 	return w.Error()
 }
 
+func expBigSamples(w *csv.Writer) error {
+	m := modBig()
+	x := bigSized(m.BitLen())
+	x.Mod(x, m)
+	for i := 0; i < expBits; i++ {
+		y := withHammingWeight(expBits, i).Big()
+		t := timeFunction(func() {
+			resultBig = x.Exp(x, y, m)
+		})
+		if err := w.Write([]string{"ModExpBig", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", t)}); err != nil {
+			return err
+		}
+	}
+	w.Flush()
+	return w.Error()
+}
+
+func expNatSamples(w *csv.Writer) error {
+	m := mod2048()
+	x := natSized(m.BitLen())
+	x.Mod(x, m)
+	for i := 0; i < expBits; i++ {
+		y := withHammingWeight(expBits, i)
+		t := timeFunction(func() {
+			resultNat = x.Exp(x, y, m)
+		})
+		if err := w.Write([]string{"ModExpNat", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", t)}); err != nil {
+			return err
+		}
+	}
+	w.Flush()
+	return w.Error()
+}
+
 func csvA() error {
 	w := csv.NewWriter(os.Stdout)
 	if err := w.Write([]string{"method", "bits", "ns"}); err != nil {
@@ -86,6 +130,12 @@ func csvA() error {
 		return err
 	}
 	if err := modAddNatSamples(w); err != nil {
+		return err
+	}
+	if err := expBigSamples(w); err != nil {
+		return err
+	}
+	if err := expNatSamples(w); err != nil {
 		return err
 	}
 	w.Flush()
