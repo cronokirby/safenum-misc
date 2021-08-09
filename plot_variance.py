@@ -9,11 +9,13 @@ def modaddplot(df):
         'Big': list(df[df.method == 'ModAddBig'].ns),
         'Nat': list(df[df.method == 'ModAddNat'].ns),
     })
-    ax = preproc.plot(x="Bits", y="Nat", legend=False)
-    ax2 = ax.twinx()
-    preproc.plot(x="Bits", y="Big", ax=ax2, legend=False, color="r")
-    ax.figure.legend()
-    plt.title('ModAdd Execution Time')
+    ax = plt.subplot(2, 1, 1)
+    preproc.plot(x="Bits", y="Nat", ax=ax, legend=False)
+    plt.title('ModAdd Execution Time (Nat)')
+    ax = plt.subplot(2, 1, 2)
+    preproc.plot(x="Bits", y="Big", ax=ax, legend=False, color="r")
+    plt.title('ModAdd Execution Time (Big)')
+    plt.tight_layout()
     plt.savefig('./.out/modadd.png')
     pass
 
@@ -23,11 +25,13 @@ def expplot(df):
         'Big': list(df[df.method == 'ModExpBig'].ns),
         'Nat': list(df[df.method == 'ModExpNat'].ns),
     })
-    ax = preproc.plot(x="Hamming Weight", y="Nat", legend=False)
-    ax2 = ax.twinx()
-    preproc.plot(x="Hamming Weight", y="Big", ax=ax2, legend=False, color="r")
-    ax.figure.legend()
-    plt.title('Exp Execution Time')
+    plt.clf()
+    ax = plt.subplot(2, 1, 1)
+    preproc.plot(x="Hamming Weight", y="Nat", ax=ax, legend=False)
+    plt.title('Exp Execution Time (Nat)')
+    ax = plt.subplot(2, 1, 2)
+    preproc.plot(x="Hamming Weight", y="Big", ax=ax, legend=False, color="r")
+    plt.title('Exp Execution Time (Big)')
     plt.savefig('./.out/exp.png')
 
 
