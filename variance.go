@@ -44,7 +44,8 @@ func modBig() *big.Int {
 	return mod2048().Big()
 }
 
-const average = 400
+const average = 25
+const outerAverage = 16
 
 func timeFunction(f func()) time.Duration {
 
@@ -64,29 +65,40 @@ var resultNat *safenum.Nat = new(safenum.Nat)
 
 func modAddBigSamples(w *csv.Writer) error {
 	m := modBig()
-	for i := 0; i < maxBits; i++ {
-		x := bigSized(i)
-		t := timeFunction(func() {
-			resultBig.Add(x, x)
-			resultBig.Mod(resultBig, m)
-		})
-		if err := w.Write([]string{"ModAddBig", fmt.Sprintf("%d", i), fmt.Sprintf("%d", t)}); err != nil {
+	durations := make([]time.Duration, maxBits)
+	for j := 0; j < outerAverage; j++ {
+		for i := 0; i < len(durations); i++ {
+			x := bigSized(i)
+			durations[i] += timeFunction(func() {
+				resultBig.Add(x, x)
+				resultBig.Mod(resultBig, m)
+			})
+		}
+	}
+	for i := 0; i < len(durations); i++ {
+		if err := w.Write([]string{"ModAddBig", fmt.Sprintf("%d", i), fmt.Sprintf("%d", durations[i]/outerAverage)}); err != nil {
 			return err
 		}
 	}
+
 	w.Flush()
 	return w.Error()
 }
 
 func modAddNatSamples(w *csv.Writer) error {
 	m := mod2048()
-	for i := 0; i < maxBits; i++ {
-		x := natSized(i).Resize(maxBits)
-		resultNat.Resize(maxBits)
-		t := timeFunction(func() {
-			resultNat.ModAdd(x, x, m)
-		})
-		if err := w.Write([]string{"ModAddNat", fmt.Sprintf("%d", i), fmt.Sprintf("%d", t)}); err != nil {
+	durations := make([]time.Duration, maxBits)
+	for j := 0; j < outerAverage; j++ {
+		for i := 0; i < len(durations); i++ {
+			x := natSized(i).Resize(maxBits)
+			resultNat.Resize(maxBits)
+			durations[i] += timeFunction(func() {
+				resultNat.ModAdd(x, x, m)
+			})
+		}
+	}
+	for i := 0; i < len(durations); i++ {
+		if err := w.Write([]string{"ModAddNat", fmt.Sprintf("%d", i), fmt.Sprintf("%d", durations[i]/outerAverage)}); err != nil {
 			return err
 		}
 	}
@@ -98,12 +110,18 @@ func expBigSamples(w *csv.Writer) error {
 	m := modBig()
 	x := bigSized(m.BitLen())
 	x.Mod(x, m)
-	for i := 0; i < expBits; i++ {
-		y := withHammingWeight(expBits, i).Big()
-		t := timeFunction(func() {
-			resultBig.Exp(x, y, m)
-		})
-		if err := w.Write([]string{"ModExpBig", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", t)}); err != nil {
+	durations := make([]time.Duration, expBits)
+	for j := 0; j < outerAverage; j++ {
+		for i := 0; i < len(durations); i++ {
+			y := withHammingWeight(expBits, i).Big()
+			durations[i] += timeFunction(func() {
+				resultBig.Exp(x, y, m)
+			})
+
+		}
+	}
+	for i := 0; i < len(durations); i++ {
+		if err := w.Write([]string{"ModExpBig", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", durations[i]/outerAverage)}); err != nil {
 			return err
 		}
 	}
@@ -115,15 +133,21 @@ func expNatSamples(w *csv.Writer) error {
 	m := mod2048()
 	x := natSized(m.BitLen())
 	x.Mod(x, m)
-	for i := 0; i < expBits; i++ {
-		y := withHammingWeight(expBits, i)
-		t := timeFunction(func() {
-			resultNat.Exp(x, y, m)
-		})
-		if err := w.Write([]string{"ModExpNat", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", t)}); err != nil {
+	durations := make([]time.Duration, expBits)
+	for j := 0; j < outerAverage; j++ {
+		for i := 0; i < len(durations); i++ {
+			y := withHammingWeight(expBits, i)
+			durations[i] += timeFunction(func() {
+				resultNat.Exp(x, y, m)
+			})
+		}
+	}
+	for i := 0; i < len(durations); i++ {
+		if err := w.Write([]string{"ModExpNat", fmt.Sprintf("%d", i+1), fmt.Sprintf("%d", durations[i]/outerAverage)}); err != nil {
 			return err
 		}
 	}
+
 	w.Flush()
 	return w.Error()
 }

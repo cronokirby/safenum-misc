@@ -2,3 +2,5 @@ github.com/cronokirby/safenum v0.17.0 h1:2f6RtEWs+/Z5yBGXFg7/KlRNN2C4svi4ReA9g9E
 github.com/cronokirby/safenum v0.17.0/go.mod h1:AWp82xwEqKcnrpJPXPa1m0gF/OY8dzgL17ubUBnVygA=
 github.com/cronokirby/safenum v0.25.0 h1:3owHW181y3Ns+7nMRH0W9JuLi1H63imy6EngBlh9VHQ=
 github.com/cronokirby/safenum v0.25.0/go.mod h1:AWp82xwEqKcnrpJPXPa1m0gF/OY8dzgL17ubUBnVygA=
+github.com/cronokirby/safenum v0.29.0 h1:kf1/8vvN/yQjrZU3tR/vDb5OdIQp2uJ6WvPVbU61J+E=
+github.com/cronokirby/safenum v0.29.0/go.mod h1:AWp82xwEqKcnrpJPXPa1m0gF/OY8dzgL17ubUBnVygA=

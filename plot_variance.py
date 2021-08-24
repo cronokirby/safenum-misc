@@ -7,16 +7,16 @@ def modaddplot(df):
     preproc = pd.DataFrame(
         {
             "Bits": list(df[df.method == "ModAddBig"].bits),
-            "Big": list(df[df.method == "ModAddBig"].ns),
-            "Nat": list(df[df.method == "ModAddNat"].ns),
+            "Go's big.Int": list(df[df.method == "ModAddBig"].ns),
+            "safenum": list(df[df.method == "ModAddNat"].ns),
         }
     )
-    ax = plt.subplot(2, 1, 1)
-    preproc.plot(x="Bits", y="Nat", ax=ax, legend=False, xlabel="", ylabel="ns")
-    plt.title("ModAdd Execution Time (Nat)")
-    ax = plt.subplot(2, 1, 2)
-    preproc.plot(x="Bits", y="Big", ax=ax, legend=False, color="r", ylabel="ns")
-    plt.title("ModAdd Execution Time (Big)")
+    plt.clf()
+    ax = plt.subplot(1, 1, 1)
+    preproc.plot(x="Bits", y="safenum", ax=ax, legend=False, xlabel="", ylabel="ns")
+    preproc.plot(x="Bits", y="Go's big.Int", ax=ax, legend=False, color="r", ylabel="ns")
+    ax.figure.legend()
+    plt.title("Execution time of Modular Addition")
     plt.tight_layout()
     plt.savefig("./.out/modadd.png")
     pass
@@ -26,21 +26,23 @@ def expplot(df):
     preproc = pd.DataFrame(
         {
             "Hamming Weight": list(df[df.method == "ModExpBig"].bits),
-            "Big": list(df[df.method == "ModExpBig"].ns),
-            "Nat": list(df[df.method == "ModExpNat"].ns),
+            "Go's big.Int": list(df[df.method == "ModExpBig"].ns),
+            "safenum": list(df[df.method == "ModExpNat"].ns),
         }
     )
     plt.clf()
-    ax = plt.subplot(2, 1, 1)
+    ax = plt.subplot(1, 1, 1)
     preproc.plot(
-        x="Hamming Weight", y="Nat", ax=ax, legend=False, xlabel="", ylabel="ns"
+        x="Hamming Weight", y="safenum", ax=ax, legend=False, xlabel="", ylabel="ns",
+        logy=False
     )
     plt.title("Exp Execution Time (Nat)")
-    ax = plt.subplot(2, 1, 2)
     preproc.plot(
-        x="Hamming Weight", y="Big", ax=ax, legend=False, color="r", ylabel="ns"
+        x="Hamming Weight", y="Go's big.Int", ax=ax, legend=False, color="r", ylabel="ns",
+        logy=False
     )
-    plt.title("Exp Execution Time (Big)")
+    ax.figure.legend()
+    plt.title("Execution time of Exponentiation")
     plt.savefig("./.out/exp.png")
 
 
